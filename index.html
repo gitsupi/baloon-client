@@ -1,0 +1,565 @@
+<html>
+
+<head>
+	<title>شبیه سازی پرواز</title>
+	<meta name="misapplication-tap-highlight" content="no" />
+	<meta name="msapplication-TileImage" content="apple-touch-icon.png">
+	<meta name="msapplication-TileColor" content="#47619e">
+	<script type="text/javascript">
+		(function (doc) {
+			var viewport = document.getElementById('viewport');
+			if (navigator.userAgent.match(/iPhone/i) || navigator.userAgent.match(/iPod/i)) {
+				doc.getElementById("viewport").setAttribute("content", "width=1200");
+			} else if (navigator.userAgent.match(/iPad/i)) {
+				doc.getElementById("viewport").setAttribute("content", "width=1200, user-scalable=no");
+			}
+		}(document));
+	</script>
+	<meta name="apple-mobile-web-app-capable" content="yes" />
+	<script src="https://api.mapbox.com/mapbox-gl-js/v1.6.1/mapbox-gl.js"></script>
+	<link href="https://api.mapbox.com/mapbox-gl-js/v1.6.1/mapbox-gl.css" rel="stylesheet" />
+
+	<link rel="stylesheet" href="css/strato-theme/jquery-ui-1.9.1.custom.min.css" />
+	<link rel="stylesheet" href="css/strato.css" />
+	<link rel="shortcut icon" href="favicon.ico" />
+	<script type="text/javascript" src="js/jquery-1.8.2.min.js"></script>
+	<script type="text/javascript" src="js/jquery-ui-1.9.1.custom.min.js"></script>
+	<script type="text/javascript" src="js/jquery-ui-timepicker-addon.js"></script>
+	<script type="text/javascript" src="js/jquery.nicescroll.min.js"></script>
+	<script type="text/javascript" src="js/regexp.js"></script>
+	<script type="text/javascript"
+		src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAyrVdCxh_oYXkGG16PN5sErMGF5o6MZkc&amp;sensor=false&amp;libraries=places,visualization,geometry">
+		</script>
+	<script type="text/javascript" src="js/infobox.js"></script>
+	<script type="text/javascript" src="js/balloons_parachutes.js"></script>
+	<script type="text/javascript" src="js/strato.js"></script>
+	<script type="text/javascript">
+		$(document).ready(function () {
+			// Repopulate form with pre-existing data
+			var fromFileUpload = 0;
+
+			$('#weatherFileStatus').val('0');
+
+			if (fromFileUpload) {
+				$('.section_header').addClass('closed');
+				$('.section').addClass('closed');
+				$('#weatherData').removeClass('closed');
+				$('#weatherData_icon').parent().removeClass('closed');
+			}
+
+
+			$('#flightInfo_gastype').buttonset("refresh");
+			$('#weatherData_source').buttonset("refresh");
+			$('#weatherData_definition').buttonset("refresh");
+			$('#simSettings_flightType').buttonset("refresh");
+
+			// Validate fields on page loading
+			validateForm();
+
+		});
+	</script>
+	<style>
+		/* body {
+			margin: 0;
+			padding: 0;
+		} */
+
+		#map {
+			position: absolute;
+			top: 0;
+			bottom: 0;
+			width: 100%;
+		}
+
+		#mapinfo {
+			display: block;
+			position: relative;
+			margin: 0px auto;
+			width: 50%;
+			padding: 10px;
+			border: none;
+			border-radius: 3px;
+			font-size: 12px;
+			text-align: center;
+			color: #222;
+			background: inherit;
+		}
+	</style>
+</head>
+
+<body>
+	<script
+		src="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-geocoder/v4.5.1/mapbox-gl-geocoder.min.js"></script>
+	<link rel="stylesheet"
+		href="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-geocoder/v4.5.1/mapbox-gl-geocoder.css"
+		type="text/css" />
+
+
+	<div id="wrapper">
+
+		<div id="top_bar" class="shadow">
+			<div id="top_bar_title"><a target="_blank" style="color:#CCDDFF;">شبیه ساز پرواز بالن و آب و
+					هوا</a>&nbsp;&nbsp;&nbsp;کاستومایز شده برای ابولی
+			</div>
+		</div>
+
+
+		<div id="main_area">
+
+			<div id="left_bar">
+				<div id="left_bar_title">تنظیمات</div>
+				<form name="flightInfoForm" id="flightInfoForm"
+					action="http://astra-planner.soton.ac.uk/sounding_upload.php" method="post"
+					enctype="multipart/form-data">
+					<div id="flightInfo" class="section animate">
+						<div class="section_header">
+							<div id="flightInfo_icon" class="icon"></div>
+							<div class="section_title">اطلاعات پرواز</div>
+						</div>
+						<div class="option_title">Launch date and time (<span
+								title="For <b>LAND</b> launch sites, use the location's local time.<br />For <b>SEA</b> launch sites, use UTC time."
+								id="local_time">local time</span>)</div>
+						<input type="hidden" name="flightInfo_datetimeFull" id="flightInfo_datetimeFull"></input>
+						<input type="hidden" name="flightInfo_dateandtime" id="flightInfo_dateandtime"></input>
+						<div id="flightInfo_date" name="flightInfo_date" class="option_content"></div>
+						<div class="option_title">Gas type</div>
+						<div id="flightInfo_gastype" class="option_content">
+							<input type="radio" id="helium" name="gasType" value="Helium" checked="checked" /><label
+								for="helium">Helium</label>
+							<input type="radio" id="hydrogen" name="gasType" value="Hydrogen" /><label
+								for="hydrogen">Hydrogen</label>
+						</div>
+						<div class="option_title">Balloon model</div>
+						<select id="flightInfo_balloonweight" name="flightInfo_balloonweight" class="option_content">
+							<option value="0">Select one...</option>
+						</select>
+						<div class="option_title">Parachute model</div>
+						<select id="flightInfo_chutetype" name="flightInfo_chutetype" class="option_content">
+							<option value="">Select one...</option>
+						</select>
+						<div class="option_title">Payload weight</div>
+						<div class="option_contentAndUnit">
+							<input type="number" id="flightInfo_payloadweight" name="flightInfo_payloadweight" min="0"
+								step="0.1" class="option_content option_content_inputText float"></input>
+							<div class="option_unit">kg</div>
+						</div>
+						<div class="option_title">Nozzle lift</div>
+						<div class="option_contentAndUnit">
+							<input type="number" id="flightInfo_nozzlelift" name="flightInfo_nozzlelift" min="0"
+								step="0.1" class="option_content option_content_inputText float"
+								title="Warning: the nozzle lift has to be greater than the payload weight!"></input>
+							<div class="option_unit">kg</div>
+						</div>
+						<div class="option_title">Train equivalent sphere diameter</div>
+						<div class="option_contentAndUnit" style="margin-bottom: 10px;">
+							<input type="number" id="flightInfo_trainequivdiam" name="flightInfo_trainequivdiam" min="0"
+								step="0.1" class="option_content option_content_inputText float"
+								title="This is the diameter of the sphere that generates the same drag as the payload train. <b>Typical values: 0.1 - 0.3</b>"></input>
+							<div class="option_unit">m</div>
+						</div>
+					</div>
+					<div id="launchSite" class="section animate">
+						<div class="section_header closed">
+							<div id="launchSite_icon" class="icon"></div>
+							<div class="section_title">موقعیت سایت لانچ</div>
+						</div>
+						<div class="option_title">Search for a location</div>
+						<input type="text" id="launchSite_search" class="option_content option_content_inputText"
+							placeholder="Type any location"></input>
+						<input type="hidden" id="launchSite_lat" name="launchSite_lat"></input>
+						<input type="hidden" id="launchSite_lon" name="launchSite_lon"></input>
+						<input type="hidden" id="launchSite_elev" name="launchSite_elev" value="0"></input>
+						<div class="option_title">or</div>
+						<div class="option_content" id="launchSite_pickbtn">
+							<div id="launchSite_btn_icon"></div>PICK ON THE MAP
+						</div>
+						<div class="option_title">or</div>
+						<div class="option_content" id="launchSite_pickgps">
+							<div id="launchSite_gps_icon"></div>وارد کردن موقعیت مکانی
+						</div>
+						<div class="option_title">or</div>
+						<div class="option_content" id="launchSite_pickuserloc">
+							<div id="launchSite_userloc_icon"></div>موقعیت مکانی شما
+						</div>
+						<div class="option_title" id="text_lat">LAUNCH SITE NOT SET</div>
+						<div class="option_title" id="text_lon" style="margin-top: 5px; margin-bottom: 10px;">&nbsp;
+						</div>
+					</div>
+					<div id="weatherData" class="section animate closed">
+						<div class="section_header closed">
+							<div id="weatherData_icon" class="icon"></div>
+							<div class="section_title">اطلاعات آب و هوا</div>
+						</div>
+						<div class="option_title wxr">Select a weather source</div>
+						<div id="weatherData_source" class="option_content wxr">
+							<input type="radio" id="online" name="weatherSource" value="online" /><label
+								for="online">Online forecast</label>
+							<input type="radio" disabled id="sounding" name="weatherSource" value="sounding" /><label
+								for="sounding" >Load sounding</label>
+						</div>
+						<div id="weatherData_extra_forecast"
+							class="animate weatherData_extraSection weatherData_extraSection_closed">
+							<div class="option_title wxr">Forecast quality </div>
+							<div id="weatherData_definition" class="option_content wxr">
+								<input type="radio" id="HD" name="forecastDefinition" value="HD" checked="checked"
+									title="HD: 0.25 x 0.25 deg lat/lon, 26 altitude levels (only up to 10 mbar press alt. Standard quality is used for higher alt)" /><label
+									for="HD"
+									title="HD: 0.25 x 0.25 deg lat/lon, 26 altitude levels (only up to 10 mbar press alt. Standard quality is used for higher alt)">High</label>
+								<input type="radio" id="SD" name="forecastDefinition" value="SD"
+									title="SD: 0.5 x 0.5 deg lat/lon, 47 altitude levels" /><label for="SD"
+									title="SD: 0.5 x 0.5 deg lat/lon, 47 altitude levels">Standard</label>
+							</div>
+						</div>
+						<div id="weatherData_extra_sounding"
+							class="animate weatherData_extraSection weatherData_extraSection_closed">
+							<div class="option_title wxr">Select the sounding file</div>
+							<input type="hidden" name="weatherFileStatus" id="weatherFileStatus"></input>
+							<input type="file" class="option_content wxr" name="weatherData_file"
+								id="weatherData_file"></input>
+							<div class="option_content wxr animate inactive" id="weatherData_loadBtn"
+								title="Accepted formats: .sounding and .ftr">Load sounding</div>
+							<div class="option_title wxr">Inflation Temperature</div>
+							<div class="option_contentAndUnit wxr">
+								<input type="number" id="weatherData_temperature" name="weatherData_temperature"
+									step="0.1" class="option_content option_content_inputText float"></input>
+								<div class="option_unit">&deg;C</div>
+							</div>
+							<div class="option_title wxr">Distance of sounding from launch site</div>
+							<div class="option_contentAndUnit wxr">
+								<input type="number" id="weatherData_soundingDistance"
+									name="weatherData_soundingDistance" min="0" step="0.1"
+									class="option_content option_content_inputText float"></input>
+								<div class="option_unit">km</div>
+							</div>
+							<div class="option_title wxr">Time between sounding and launch</div>
+							<div class="option_contentAndUnit wxr">
+								<input type="number" id="weatherData_soundingTime" name="weatherData_soundingTime"
+									min="0" step="0.1" class="option_content option_content_inputText float"
+									title="This is the diameter of the sphere that generates the same drag as the payload train."></input>
+								<div class="option_unit">hours</div>
+							</div>
+						</div>
+					</div>
+					<div id="simSettings" class="section animate closed">
+						<div class="section_header closed">
+							<div id="simSettings_icon" class="icon"></div>
+							<div class="section_title">تنظیمات شبیه سازی</div>
+						</div>
+						<div>
+							<div class="option_title" style="display: inline-block;">Number of simulation runs:</div>
+							<input type="text" id="simSettings_simRuns" name="simSettings_simRuns"
+								readonly="readonly"></input>
+						</div>
+						<div id="simSettings_slider" class="option_content"></div>
+						<input type="hidden" id="simSettings_sliderIndex" name="simSettings_sliderIndex"></input>
+						<div class="option_title">Select a flight type</div>
+						<div id="simSettings_flightType" class="option_content"
+							title="Standard: The balloon will ascend, burst and land.<br /> Floating: The balloon will vent gas once a target altitude is reached and will carry on floating without bursting.">
+							<input type="radio" id="standard" name="flightType" value="standard"
+								checked="checked" /><label for="standard" style="width:93px;">Standard</label>
+							<input type="radio" id="floating" name="flightType" value="floating" /><label for="floating"
+								style="width:93px;">Floating</label>
+						</div>
+						<div class="option_title">Floating Altitude</div>
+						<div class="option_contentAndUnit">
+							<input type="number" id="simSettings_floatAlt" name="simSettings_floatAlt" min="0"
+								step="100" class="option_content option_content_inputText float"></input>
+							<div class="option_unit">m</div>
+						</div>
+						<div class="option_title">Maximum Flight Duration</div>
+						<div class="option_contentAndUnit">
+							<input type="number" id="simSettings_flightTime" name="simSettings_flightTime" min="0"
+								step="0.1" class="option_content option_content_inputText float"
+								title="Warning: the maximum allowed flight time is 144 hours!"></input>
+							<div class="option_unit">hours</div>
+						</div>
+					</div>
+					<div id="runButton" class="inactive"
+						title="The simulation setup is not complete. Please review your settings.">
+						<div id="runButton_icon" class="icon"></div>
+						<div class="section_title" style="margin-top:-1px;">اجرای شبیه سازی</div>
+					</div>
+					<div id="timeWarning" class="hidden animate">
+						<b>WARNING</b> This simulation will take approximately <span id="warning_minutes"></span>
+						minutes to complete.
+					</div>
+					<div id="blankSpace" style="height:20px;"></div>
+				</form>
+			</div>
+
+			<div id="simRunning" class="animate hidden">
+				<div id="simRunning_text">
+					<div id="simRunning_caption">Starting the simulation...</div>
+					<div id="simRunning_progressBar"></div>
+				</div>
+			</div>
+
+			<div id="map_wrap">
+				<div class="animate hidden" id="launchSite_instruction">Click on the map to set the launch site</div>
+				<div class="animate hidden" id="click_instruction">Hint: you can click on any marker to get extra
+					information</div>
+				<div id="map"></div>
+				<pre id="mapinfo"></pre>
+
+				<div id="map_area" class="" style="display: none;">
+					<div id="map_msg">The world map is loading...</div>
+				</div>
+			</div>
+
+			<div id="options_menu" class="animate hidden" onmouseover=" $(this).height(190); "
+				onmouseout=" $(this).height(28); ">
+				<div style="margin-top: 5px; cursor: default;">Export and view options</div>
+				<div class="menu_section">Show on map:</div>
+				<div id="view_paths" class="selected_view menu_item">Flight paths</div>
+				<div id="view_heatmap" class="menu_item">Landing site heat map</div>
+				<div class="menu_section">Export data as:</div>
+				<div id="export_csv" class="menu_item">CSV</div>
+				<div id="export_kml" class="menu_item">KML</div>
+			</div>
+
+			<div id="custom_marker" class="animate">
+				<div style="margin-top: 2px;"
+					title="Add a custom marker on the map. This is only for your reference and will not affect the simulation.">
+					علامت گذاری موقیت مکانی</div>
+			</div>
+
+			<div id="shader" class="animate hidden"></div>
+
+			<div id="gps_dialog" class="animate hidden">
+				<div class="gps_title" style="font-weight: bold;">Enter the GPS coordinates of the launch site</div>
+				<div class="gps_row">Latitude:<input class="gps_field option_content_inputText" type="number"
+						id="gps_lat" min="-90" max="90" step="0.001" placeholder="e.g. 50.93543"
+						title="Coordinate should be a value between -90 and 90, where the negative sign indicates south of the Equator."></input>
+				</div>
+				<div class="gps_row">Longitude:<input class="gps_field option_content_inputText" type="number"
+						id="gps_lon" min="-179.999" max="180" step="0.001" placeholder="e.g. -1.39619"
+						title="Coordinate should be a value between -180 and 180, where the negative sign indicates west of Greenwich."></input>
+				</div>
+				<div id="gps_save">Save</div>
+			</div>
+
+			<div id="custom_gps_dialog" class="animate hidden" dir="rtl">
+				<div class="gps_title" style="font-weight: bold;">موقعیت جغرافیایی مکان دلخواه را وارد نمایید</div>
+				<div class="gps_row">عرض جغرافیایی:<input class="gps_field option_content_inputText" type="number"
+						id="custom_gps_lat" min="-90" max="90" step="0.001" placeholder="&nbsp;مثال 50.93543"
+						title="Coordinate should be a value between -90 and 90, where the negative sign indicates south of the Equator."></input>
+				</div>
+				<div class="gps_row">طول جغرافیایی:<input class="gps_field option_content_inputText" type="number"
+						id="custom_gps_lon" min="-90" max="90" step="0.001" placeholder="&nbsp;مثال -1.39619"
+						title="Coordinate should be a value between -180 and 180, where the negative sign indicates west of Greenwich."></input>
+				</div>
+				<div class="gps_row">نام موقعیت:<input class="gps_field option_content_inputText" type="text"
+						id="custom_gps_name" placeholder="&nbsp;اختیاری"></input></div>
+				<div id="custom_gps_save">ذخیره</div>
+			</div>
+
+			<div id="about_dialog" class="animate hidden">
+				<div class="info_title">How does it work?</div>
+				<div class="info_content">
+					This service simulates the flight of a latex gas balloon in Earth's atmosphere.<br /><br />
+					The underlying mathematical model (described in detail in the paper linked below) is approximated
+					numerically using the Livermore Solver for Ordinary Differential Equations (LSODE).<br /><br />
+					The atmospheric conditions are based on the forecast obtained from the US National Oceanic and
+					Atmospheric Administration.<br /><br />
+					There are a number of sources of uncertainty, which affect the results of the simulation - a
+					Monte-Carlo procedure is used to provide an indication of the associated error margins.<br /><br />
+					The parameters that are currently implemented to vary in a Monte Carlo simulation are the
+					following:<br />
+					&#149; Coefficient of drag of the balloon;<br />
+					&#149; Fraction of the balloon that remains attached to the payload train on descent;<br />
+					&#149; Coefficient of drag of the parachute;<br />
+					&#149; Balloon burst diameter (see the academic paper for details);<br />
+					&#149; Wind perturbations (only if an atmospheric sounding is being used as source of weather data).
+					<br /><br />
+					For further information, see the academic paper.
+					<br /><br />
+					A detailed presentation of the model, as well as of its computational implementation, can be found
+					in the proceedings of the American Institute of Aeronautics and Astronautics 2013 Balloon Systems
+					Conference (<a href="http://www.southampton.ac.uk/~as7/publ/daytona2013.pdf"
+						target="_blank">Sóbester et al., 2013</a>).
+				</div>
+			</div>
+
+			<div id="credits_dialog" class="animate hidden">
+				<div class="info_title">Credits</div>
+				<div class="info_content">
+					This service is provided by the <a href="http://www.southampton.ac.uk/~astra/" target="_blank">ASTRA
+						(Atmospheric Science Through Robotic Aircraft)</a> initative.<br /><br />
+					System architecture and code by Niccolò Zapponi, based on the mathematical model described <a
+						href="http://www.southampton.ac.uk/~as7/publ/daytona2013.pdf"
+						target="_blank">here</a>.<br /><br />
+					For service updates and new features, or for any questions, follow us on Twitter <a
+						href="http://twitter.com/SotonASTRA" target="_blank">@SotonASTRA</a>!
+				</div>
+			</div>
+
+			<div id="tac_dialog" class="animate hidden">
+				<div class="info_title">Terms &amp; Conditions</div>
+				<div class="info_content">
+					This service is offered in the hope that it will be useful, but <span
+						style="font-weight: bold;">WITHOUT ANY WARRANTY</span>;<br /><br />
+					without even the implied warranty of <span style="font-weight: bold;">MERCHANTABILITY</span> or
+					<span style="font-weight: bold;">FITNESS FOR A PARTICULAR PURPOSE</span>.<br /><br /><br />
+				</div>
+			</div>
+
+			<div class="infobox-wrapper">
+				<div id="infoBox" class="animate">
+					<div id="infoBox_title" style="font-size: 13px; font-weight: bold;"></div>
+					<div id="infoBox_subtitle" style="font-size: 11px;"></div>
+					<div id="infoBox_content" style="margin-top: 0px;"></div>
+				</div>
+			</div>
+
+		</div>
+	</div>
+
+	<script>
+		mapboxgl.accessToken = 'pk.eyJ1IjoiYmVueWFtaW5paWkiLCJhIjoiY2sxd2YxemV4MDEyMDNucnc5YzZvemI1NyJ9.KAoiEdXjvwpjQ71uMzkR7A';
+		mapboxgl.setRTLTextPlugin(
+			'https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-rtl-text/v0.2.3/mapbox-gl-rtl-text.js',
+			null,
+			true // Lazy load the plugin
+		);
+
+
+
+
+
+		var map = new mapboxgl.Map({
+			container: 'map',
+			style: 'mapbox://styles/mapbox/streets-v11',
+			center: [51.34, 35.69],
+			zoom: 8
+		});
+		var map2=map;	
+		var marker = new mapboxgl.Marker()
+			.setLngLat([51.34, 35.69])
+
+		// The `click` event is an example of a `MapMouseEvent`.
+		// Set up an event listener on the map.
+
+		map.on('click', function (e) {
+			// The event object (e) contains information like the
+			// coordinates of the point on the map that was clicked.
+			marker.remove()
+			marker = new mapboxgl.Marker()
+				.setLngLat([e.lngLat.lng, e.lngLat.lat])
+				.addTo(this);
+
+			$('#launchSite_lat').val(e.lngLat.lat);
+			$('#launchSite_lon').val(e.lngLat.lng);
+			updateCoords();
+
+
+			console.log('A click event has occurred at ' + e.lngLat.lat);
+		});
+
+		map.on('mousemove', function (e) {
+			document.getElementById('mapinfo').innerHTML =
+				// e.point is the x, y coordinates of the mousemove event relative
+				// to the top-left corner of the map
+				// JSON.stringify(e.point) +
+				// '<br />' +
+				// e.lngLat is the longitude, latitude geographical position of the event
+				JSON.stringify(e.lngLat.wrap());
+		});
+
+
+		/* given a query in the form "lng, lat" or "lat, lng" returns the matching
+		* geographic coordinate(s) as search results in carmen geojson format,
+		* https://github.com/mapbox/carmen/blob/master/carmen-geojson.md
+		*/
+		var coordinatesGeocoder = function (query) {
+			// match anything which looks like a decimal degrees coordinate pair
+			var matches = query.match(
+				/^[ ]*(?:Lat: )?(-?\d+\.?\d*)[, ]+(?:Lng: )?(-?\d+\.?\d*)[ ]*$/i
+			);
+			if (!matches) {
+				return null;
+			}
+
+			function coordinateFeature(lng, lat) {
+				marker.remove()
+				$('#launchSite_lat').val(lat);
+				$('#launchSite_lon').val(lng);
+				updateCoords();
+				return {
+					center: [lng, lat],
+					geometry: {
+						type: 'Point',
+						coordinates: [lng, lat]
+					},
+					place_name: 'Lat: ' + lat + ' Lng: ' + lng,
+					place_type: ['coordinate'],
+					properties: {},
+					type: 'Feature'
+				};
+			}
+
+			var coord1 = Number(matches[1]);
+			var coord2 = Number(matches[2]);
+			var geocodes = [];
+
+			if (coord1 < -90 || coord1 > 90) {
+				// must be lng, lat
+				geocodes.push(coordinateFeature(coord1, coord2));
+			}
+
+			if (coord2 < -90 || coord2 > 90) {
+				// must be lat, lng
+				geocodes.push(coordinateFeature(coord2, coord1));
+			}
+
+			if (geocodes.length === 0) {
+				// else could be either lng, lat or lat, lng
+				geocodes.push(coordinateFeature(coord1, coord2));
+				geocodes.push(coordinateFeature(coord2, coord1));
+			}
+
+
+			return geocodes;
+		};
+
+		map.addControl(
+			new MapboxGeocoder({
+				accessToken: mapboxgl.accessToken,
+				localGeocoder: coordinatesGeocoder,
+				zoom: 4,
+				placeholder: 'Try: -40, 170',
+				mapboxgl: mapboxgl
+			})
+		);
+
+		// Bind event to save GPS coordinates of launch site
+		$('#gps_save').click(function () {
+			if (validateGps($('#gps_lat'), $('#gps_lon'))) {
+				$('#shader').addClass('hidden');
+				$('#gps_dialog').addClass('hidden');
+				$('#shader').zIndex(-2);
+				$('#gps_dialog').zIndex(-1);
+
+				$('#launchSite_lat').val($('#gps_lat').val());
+				$('#launchSite_lon').val($('#gps_lon').val());
+				updateCoords();
+				marker.remove()
+				marker = new mapboxgl.Marker()
+					.setLngLat([$('#gps_lat').val(), $('#gps_lon').val()])
+					.addTo(map);
+
+				map.flyTo({
+					center: [
+						$('#gps_lon').val(),
+						$('#gps_lat').val()
+					],
+					essential: true // this animation is considered essential with respect to prefers-reduced-motion
+				});
+
+			}
+		});
+
+	</script>
+
+</body>
+
+</html>
